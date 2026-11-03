@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>MedHandover | Clinical Ward Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        medical: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            900: '#064e3b',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Docx.js for True Native Word Generation -->
+    <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+    <style>
+        body {
+            transition: background-color 0.3s ease, color 0.3s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 font-sans antialiased min-h-screen flex flex-col justify-between">
+
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-xl flex items-center space-x-3">
+        <i class="fa-solid fa-circle-check text-xl"></i>
+        <span id="toast-message" class="font-medium">Action completed successfully!</span>
+    </div>
+
+    <header class="sticky top-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <a href="#" class="flex items-center space-x-2.5 group">
+                <div class="w-9 h-9 rounded-xl bg-medical-500 flex items-center justify-center text-white shadow-lg shadow-medical-500/30 group-hover:scale-105 transition-transform">
+                    <i class="fa-solid fa-stethoscope text-lg"></i>
+                </div>
+                <span class="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white whitespace-nowrap">Med<span class="text-medical-500">Handover</span></span>
+            </a>
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <button onclick="exportToWord()" title="Export Cases as Word Document" class="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs sm:text-sm font-semibold transition-colors">
+                    <i class="fa-solid fa-file-word text-blue-500 text-base"></i>
+                    <span class="hidden sm:inline">Export Word</span>
+                </button>
+                <button onclick="toggleDarkMode()" aria-label="Toggle Dark Mode" class="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                    <i id="theme-icon" class="fa-solid fa-moon text-slate-600 dark:text-yellow-400"></i>
+                </button>
+                <button onclick="openModal()" class="inline-flex items-center px-4 py-2 rounded-xl bg-medical-500 hover:bg-medical-600 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-medical-500/30 transition-all hover:scale-105 whitespace-nowrap">
+                    <i class="fa-solid fa-plus mr-1.5"></i> Add Patient
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center">
+                    <i class="fa-solid fa-bed-pulse text-medical-500 mr-2.5"></i> Ward & ER Patient Handover
+                </h1>
+                <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Manage and transfer active surgical & emergency patient records seamlessly.</p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="px-3 py-1.5 rounded-xl bg-medical-50 dark:bg-medical-900/40 text-medical-600 dark:text-medical-400 text-xs font-bold border border-medical-500/20">
+                    <span id="patient-count">0</span> Active Cases
+                </span>
+            </div>
+        </div>
+
+        <div id="patients-container"></div>
+
+        <div id="empty-state" class="hidden text-center py-16 bg-white dark:bg-slate-800 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700 p-8 space-y-4">
+            <div class="w-16 h-16 mx-auto rounded-full bg-medical-50 dark:bg-medical-900/40 text-medical-500 flex items-center justify-center text-2xl">
+                <i class="fa-solid fa-user-injured"></i>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 dark:text-white">No active handover patients</h3>
+            <p class="text-slate-500 dark:text-slate-400 text-xs sm:text-sm max-w-sm mx-auto">Get started by clicking the "Add Patient" button above to record ward or ER admissions.</p>
+            <button onclick="openModal()" class="px-5 py-2.5 bg-medical-500 hover:bg-medical-600 text-white font-semibold rounded-xl text-sm shadow-md transition">
+                Add First Patient
+            </button>
+        </div>
+    </main>
+
+    <footer class="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 py-6 mt-12 text-center text-xs text-slate-500">
+        <p>&copy; 2026 MedHandover Clinical Dashboard. Designed for iOS & Web.</p>
+    </footer>
+
+    <div id="patient-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden p-4 overflow-y-auto">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-slate-700 relative my-auto max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-700 mb-4">
+                <h3 id="modal-title" class="text-xl font-bold text-slate-900 dark:text-white flex items-center">
+                    <i class="fa-solid fa-user-plus text-medical-500 mr-2"></i> Add New Patient Handover
+                </h3>
+                <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <form id="patient-form" onsubmit="handleSavePatient(event)" class="space-y-4 overflow-y-auto pr-1 flex-grow">
+                <input type="hidden" id="patient-id">
+                
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Patient Legal Name</label>
+                        <input type="text" id="p-name" required placeholder="e.g., John Smith / علي حسن" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Age & Gender</label>
+                        <div class="flex space-x-2">
+                            <input type="number" id="p-age" required placeholder="Age" class="w-20 px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                            <select id="p-gender" class="flex-grow px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                                <option value="Male">Male ♂</option>
+                                <option value="Female">Female ♀</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Location / Ward</label>
+                        <select id="p-location" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                            <option value="ER">Emergency Room (ER)</option>
+                            <option value="WARDS">Wards</option>
+                            <option value="Private Wing">Private Wing</option>
+                            <option value="RCU">Respiratory Care Unit (RCU)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Primary Physician</label>
+                        <input type="text" id="p-physician" placeholder="e.g., Dr. Aljanabi" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Chief Complaint / Presenting Illness</label>
+                    <textarea id="p-complaint" rows="2" required placeholder="Enter chief complaint..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm"></textarea>
+                    <div class="flex flex-wrap gap-1.5 mt-1.5">
+                        <button type="button" onclick="appendSuggestion('p-complaint', 'Chest Pain')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-medical-50 hover:text-medical-600 rounded-lg text-xs font-medium transition">+ Chest Pain</button>
+                        <button type="button" onclick="appendSuggestion('p-complaint', 'Shortness of Breath')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-medical-50 hover:text-medical-600 rounded-lg text-xs font-medium transition">+ Shortness of Breath</button>
+                        <button type="button" onclick="appendSuggestion('p-complaint', 'Acute Abdominal Pain')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-medical-50 hover:text-medical-600 rounded-lg text-xs font-medium transition">+ Abdominal Pain</button>
+                        <button type="button" onclick="appendSuggestion('p-complaint', 'Headache & Dizziness')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-medical-50 hover:text-medical-600 rounded-lg text-xs font-medium transition">+ Headache</button>
+                        <button type="button" onclick="appendSuggestion('p-complaint', 'Trauma / Fall')" class="px-2.5 py-1 bg-slate-100 dark:bg-slate-700 hover:bg-medical-50 hover:text-medical-600 rounded-lg text-xs font-medium transition">+ Trauma</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Past Medical History (PMH)</label>
+                        <input type="text" id="p-pmh" placeholder="HTN, DM, Asthma..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                        <div class="flex flex-wrap gap-1.5 mt-1.5">
+                            <button type="button" onclick="appendSuggestion('p-pmh', 'HTN')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium">HTN</button>
+                            <button type="button" onclick="appendSuggestion('p-pmh', 'Type II Diabetes')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium">DM II</button>
+                            <button type="button" onclick="appendSuggestion('p-pmh', 'Asthma')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium">Asthma</button>
+                            <button type="button" onclick="setFieldValue('p-pmh', 'None')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium text-slate-400">None</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Past Surgical History (PSH)</label>
+                        <input type="text" id="p-psh" placeholder="Appendectomy, Cholecystectomy..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                        <div class="flex flex-wrap gap-1.5 mt-1.5">
+                            <button type="button" onclick="appendSuggestion('p-psh', 'Appendectomy')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium">Appendectomy</button>
+                            <button type="button" onclick="appendSuggestion('p-psh', 'Cesarean Section')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium">C-Section</button>
+                            <button type="button" onclick="appendSuggestion('p-psh', 'Cholecystectomy')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium">Cholecystectomy</button>
+                            <button type="button" onclick="setFieldValue('p-psh', 'None')" class="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 rounded text-[11px] font-medium text-slate-400">None</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Allergies</label>
+                        <input type="text" id="p-allergies" placeholder="Penicillin, Peanuts, None..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Current Medications</label>
+                        <input type="text" id="p-medications" placeholder="Aspirin, Metformin..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Examination (O/E) & Vitals</label>
+                    <textarea id="p-exam" rows="2" placeholder="GCS 15/15, BP 120/80, HR 80, SpO2 98%..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Management Plan & Notes</label>
+                    <textarea id="p-plan" rows="2" placeholder="IV fluids, pending lab investigations, NPO..." class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Lab Test / Attachment (Optional)</label>
+                    <input type="file" id="p-image" accept="image/*" onchange="previewImage(event)" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 focus:outline-none focus:border-medical-500 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-medical-50 file:text-medical-700 hover:file:bg-medical-100">
+                    <div id="image-preview-container" class="hidden mt-2 relative inline-block">
+                        <img id="image-preview" src="" alt="Preview" class="h-24 w-auto rounded-lg border border-slate-200 dark:border-slate-700 object-cover">
+                        <button type="button" onclick="removeImage()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <input type="hidden" id="p-image-data">
+                </div>
+
+                <div class="pt-4 border-t border-slate-200 dark:border-slate-700 flex space-x-3">
+                    <button type="button" onclick="closeModal()" class="w-1/2 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 font-semibold rounded-xl text-sm transition">
+                        Cancel
+                    </button>
+                    <button type="submit" class="w-1/2 py-3 bg-medical-500 hover:bg-medical-600 text-white font-bold rounded-xl shadow-lg shadow-medical-500/30 text-sm transition">
+                        Save & Handover
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Confirm Delete Modal -->
+    <div id="confirm-modal" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 text-center scale-95 transition-transform duration-200" id="confirm-modal-content">
+            <div class="w-16 h-16 mx-auto rounded-full bg-red-100 dark:bg-red-900/30 text-red-500 flex items-center justify-center text-3xl mb-4">
+                <i class="fa-solid fa-trash-can"></i>
+            </div>
+            <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">Remove Patient?</h3>
+            <p class="text-slate-500 dark:text-slate-400 text-sm mb-6">Are you sure you want to delete this patient from the handover? This action cannot be undone.</p>
+            <div class="flex space-x-3">
+                <button type="button" onclick="closeConfirmModal()" class="w-1/2 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 font-semibold rounded-xl text-sm transition">Cancel</button>
+                <button type="button" onclick="executeDelete()" class="w-1/2 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-500/30 text-sm transition">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'med_handover_patients_v2';
+        let patients = [];
+        let activeTab = 'ER'; // Track current active tab
+
+        function initApp() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    patients = JSON.parse(saved);
+                } catch(e) {
+                    patients = [];
+                }
+            } else {
+                patients = [
+                    {
+                        id: '1',
+                        name: 'علي حسن (Ali Hasan)',
+                        age: 34,
+                        gender: 'Male',
+                        location: 'ER',
+                        physician: 'Dr. Aljanabi',
+                        complaint: 'Chest pain and mild shortness of breath upon exertion.',
+                        pmh: 'HTN',
+                        psh: 'Appendectomy',
+                        allergies: 'None known',
+                        medications: 'Aspirin 81mg',
+                        exam: 'BP 130/85, HR 88 bpm, SpO2 98% on room air. Chest clear.',
+                        plan: 'ECG done, cardiac enzymes pending, maintain IV access.'
+                    }
+                ];
+                saveToLocalStorage();
+            }
+            renderPatients();
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(patients));
+        }
+
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                icon.className = 'fa-solid fa-moon text-slate-600';
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.classList.add('dark');
+                icon.className = 'fa-solid fa-sun text-yellow-400';
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            document.getElementById('theme-icon').className = 'fa-solid fa-sun text-yellow-400';
+        }
+
+        function previewImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const MAX_WIDTH = 800;
+                        const MAX_HEIGHT = 800;
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > height) {
+                            if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            }
+                        } else {
+                            if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // Compress to JPEG to save localStorage space
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                        document.getElementById('p-image-data').value = dataUrl;
+                        document.getElementById('image-preview').src = dataUrl;
+                        document.getElementById('image-preview-container').classList.remove('hidden');
+                    }
+                    img.src = e.target.result;
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function removeImage() {
+            document.getElementById('p-image').value = '';
+            document.getElementById('p-image-data').value = '';
+            document.getElementById('image-preview').src = '';
+            document.getElementById('image-preview-container').classList.add('hidden');
+        }
+
+        function appendSuggestion(fieldId, text) {
+            const el = document.getElementById(fieldId);
+            if (el.value.trim() === '') {
+                el.value = text;
+            } else {
+                el.value = el.value + ', ' + text;
+            }
+        }
+
+        function setFieldValue(fieldId, text) {
+            document.getElementById(fieldId).value = text;
+        }
+
+        function openModal(id = null) {
+            const modal = document.getElementById('patient-modal');
+            const form = document.getElementById('patient-form');
+            form.reset();
+            document.getElementById('patient-id').value = '';
+            
+            if (id) {
+                document.getElementById('modal-title').innerHTML = '<i class="fa-solid fa-user-pen text-medical-500 mr-2"></i> Edit Patient Handover';
+                const p = patients.find(item => item.id === id);
+                if (p) {
+                    document.getElementById('patient-id').value = p.id;
+                    document.getElementById('p-name').value = p.name || '';
+                    document.getElementById('p-age').value = p.age || '';
+                    document.getElementById('p-gender').value = p.gender || 'Male';
+                    document.getElementById('p-location').value = p.location || 'ER';
+                    document.getElementById('p-physician').value = p.physician || '';
+                    document.getElementById('p-complaint').value = p.complaint || '';
+                    document.getElementById('p-pmh').value = p.pmh || '';
+                    document.getElementById('p-psh').value = p.psh || '';
+                    document.getElementById('p-allergies').value = p.allergies || '';
+                    document.getElementById('p-medications').value = p.medications || '';
+                    document.getElementById('p-exam').value = p.exam || '';
+                    document.getElementById('p-plan').value = p.plan || '';
+                    
+                    if (p.imageData) {
+                        document.getElementById('p-image-data').value = p.imageData;
+                        document.getElementById('image-preview').src = p.imageData;
+                        document.getElementById('image-preview-container').classList.remove('hidden');
+                    } else {
+                        removeImage();
+                    }
+                }
+            } else {
+                document.getElementById('modal-title').innerHTML = '<i class="fa-solid fa-user-plus text-medical-500 mr-2"></i> Add New Patient Handover';
+                removeImage();
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('patient-modal').classList.add('hidden');
+        }
+
+        function handleSavePatient(e) {
+            e.preventDefault();
+            const id = document.getElementById('patient-id').value;
+            const patientData = {
+                id: id ? id : Date.now().toString(),
+                name: document.getElementById('p-name').value,
+                age: document.getElementById('p-age').value,
+                gender: document.getElementById('p-gender').value,
+                location: document.getElementById('p-location').value,
+                physician: document.getElementById('p-physician').value,
+                complaint: document.getElementById('p-complaint').value,
+                pmh: document.getElementById('p-pmh').value,
+                psh: document.getElementById('p-psh').value,
+                allergies: document.getElementById('p-allergies').value,
+                medications: document.getElementById('p-medications').value,
+                exam: document.getElementById('p-exam').value,
+                plan: document.getElementById('p-plan').value,
+                imageData: document.getElementById('p-image-data').value
+            };
+
+            if (id) {
+                const index = patients.findIndex(item => item.id === id);
+                if (index !== -1) patients[index] = patientData;
+                showToast('Patient record updated successfully');
+            } else {
+                patients.unshift(patientData);
+                showToast('Patient added to handover list');
+            }
+
+            saveToLocalStorage();
+            renderPatients();
+            closeModal();
+        }
+
+        let patientToDelete = null;
+
+        function deletePatient(id) {
+            patientToDelete = id;
+            const modal = document.getElementById('confirm-modal');
+            const content = document.getElementById('confirm-modal-content');
+            modal.classList.remove('hidden');
+            
+            // Small delay for smooth pop-in animation
+            setTimeout(() => {
+                content.classList.remove('scale-95');
+                content.classList.add('scale-100');
+            }, 10);
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('confirm-modal');
+            const content = document.getElementById('confirm-modal-content');
+            content.classList.remove('scale-100');
+            content.classList.add('scale-95');
+            
+            // Wait for animation to finish before hiding
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                patientToDelete = null;
+            }, 200);
+        }
+
+        function executeDelete() {
+            if (patientToDelete) {
+                patients = patients.filter(p => p.id !== patientToDelete);
+                saveToLocalStorage();
+                renderPatients();
+                showToast('Patient removed from list');
+                closeConfirmModal();
+            }
+        }
+
+        function renderPatients() {
+            const container = document.getElementById('patients-container');
+            const emptyState = document.getElementById('empty-state');
+            const countEl = document.getElementById('patient-count');
+
+            countEl.innerText = patients.length;
+
+            if (patients.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            container.innerHTML = '';
+
+            // Create Tabs Navigation Container
+            const tabsWrapper = document.createElement('div');
+            // Using utility classes to hide the scrollbar while allowing horizontal scrolling on mobile
+            tabsWrapper.className = 'overflow-x-auto border-b border-slate-200 dark:border-slate-700 mb-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]';
+            const tabsContainer = document.createElement('div');
+            tabsContainer.className = 'flex space-x-2 w-max px-1';
+
+            const sections = [
+                { id: 'ER', title: 'ER', icon: 'fa-truck-medical' },
+                { id: 'WARDS', title: 'Wards', icon: 'fa-bed-pulse' },
+                { id: 'Private Wing', title: 'Private Wing', icon: 'fa-door-closed' },
+                { id: 'RCU', title: 'RCU', icon: 'fa-lungs' },
+                { id: 'Other', title: 'Other', icon: 'fa-circle-question' }
+            ];
+
+            // Render Tab Buttons
+            sections.forEach(sec => {
+                let sectionPatients;
+                if (sec.id === 'Other') {
+                    const knownIds = sections.map(s => s.id).filter(id => id !== 'Other');
+                    sectionPatients = patients.filter(p => !knownIds.includes(p.location));
+                } else {
+                    sectionPatients = patients.filter(p => p.location === sec.id);
+                }
+
+                const isActive = activeTab === sec.id;
+                const btn = document.createElement('button');
+                btn.onclick = () => { activeTab = sec.id; renderPatients(); };
+                btn.className = `flex items-center space-x-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all ${
+                    isActive 
+                    ? 'border-medical-500 text-medical-600 dark:text-medical-400 bg-medical-50/50 dark:bg-medical-900/20 rounded-t-xl' 
+                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-t-xl'
+                }`;
+                btn.innerHTML = `
+                    <i class="fa-solid ${sec.icon}"></i>
+                    <span>${sec.title}</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] ${isActive ? 'bg-medical-100 text-medical-700 dark:bg-medical-900/50 dark:text-medical-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}">${sectionPatients.length}</span>
+                `;
+                tabsContainer.appendChild(btn);
+            });
+            
+            tabsWrapper.appendChild(tabsContainer);
+            container.appendChild(tabsWrapper);
+
+            // Filter Patients based on activeTab
+            let displayPatients = patients;
+            if (activeTab === 'Other') {
+                const knownIds = sections.map(s => s.id).filter(id => id !== 'Other');
+                displayPatients = patients.filter(p => !knownIds.includes(p.location));
+            } else {
+                displayPatients = patients.filter(p => p.location === activeTab);
+            }
+
+            // Render Filtered Patients or Empty Message for that tab
+            if (displayPatients.length === 0) {
+                const emptyMsg = document.createElement('div');
+                emptyMsg.className = 'text-center py-12 text-slate-500 dark:text-slate-400 text-sm bg-slate-50/50 dark:bg-slate-800/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700';
+                emptyMsg.innerHTML = `<i class="fa-solid fa-procedures text-3xl mb-3 text-slate-300 dark:text-slate-600 block"></i> No patients in this section.`;
+                container.appendChild(emptyMsg);
+            } else {
+                const cardsWrapper = document.createElement('div');
+                cardsWrapper.className = 'space-y-4';
+                
+                displayPatients.forEach((p, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 space-y-4 transition-all hover:border-medical-500/50';
+                    
+                    card.innerHTML = `
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-700">
+                            <div class="flex items-center space-x-3">
+                                <span class="w-8 h-8 rounded-xl bg-medical-50 dark:bg-medical-900/40 text-medical-600 dark:text-medical-400 font-bold text-xs flex items-center justify-center">#${index + 1}</span>
+                                <div>
+                                    <h3 class="font-bold text-base text-slate-900 dark:text-white flex items-center">
+                                        ${escapeHtml(p.name)} <span class="ml-2 font-normal text-xs text-slate-500">${p.gender === 'Male' ? '♂' : '♀'}, ${p.age} y/o</span>
+                                    </h3>
+                                    <div class="flex items-center space-x-2 mt-0.5">
+                                        <span class="px-2 py-0.5 bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px] font-bold rounded-full">${escapeHtml(p.location)}</span>
+                                        ${p.physician ? `<span class="text-xs text-slate-400">• Attending: ${escapeHtml(p.physician)}</span>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2 self-end sm:self-auto">
+                                <button onclick="openModal('${p.id}')" title="Edit Patient" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-xs transition">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button onclick="deletePatient('${p.id}')" title="Delete Patient" class="p-2 rounded-lg bg-red-50 dark:bg-red-900/30 hover:bg-red-100 text-red-600 text-xs transition">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                            <div class="bg-slate-50 dark:bg-slate-900/40 p-3 rounded-xl space-y-1">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-medical-600 dark:text-medical-400 block"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Chief Complaint</span>
+                                <p class="text-slate-700 dark:text-slate-300 text-xs leading-relaxed">${escapeHtml(p.complaint)}</p>
+                            </div>
+                            <div class="bg-slate-50 dark:bg-slate-900/40 p-3 rounded-xl space-y-1">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-medical-600 dark:text-medical-400 block"><i class="fa-solid fa-notes-medical mr-1"></i> History & Vitals</span>
+                                <div class="text-slate-700 dark:text-slate-300 text-xs space-y-0.5">
+                                    <p><strong>PMH:</strong> ${escapeHtml(p.pmh || 'None')} | <strong>PSH:</strong> ${escapeHtml(p.psh || 'None')}</p>
+                                    <p><strong>Allergies:</strong> ${escapeHtml(p.allergies || 'None')} | <strong>Meds:</strong> ${escapeHtml(p.medications || 'None')}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        ${p.exam ? `
+                        <div class="text-xs space-y-1">
+                            <span class="font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">Examination (O/E):</span>
+                            <p class="text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/20 p-2.5 rounded-lg">${escapeHtml(p.exam)}</p>
+                        </div>` : ''}
+
+                        ${p.plan ? `
+                        <div class="text-xs space-y-1">
+                            <span class="font-semibold text-medical-600 dark:text-medical-400 uppercase tracking-wider text-[10px]">Management Plan:</span>
+                            <p class="text-slate-700 dark:text-slate-300 bg-medical-50/50 dark:bg-medical-900/10 p-2.5 rounded-lg border border-medical-500/10">${escapeHtml(p.plan)}</p>
+                        </div>` : ''}
+
+                        ${p.imageData ? `
+                        <div class="text-xs space-y-1 pt-1">
+                            <span class="font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">Attachment:</span>
+                            <div class="mt-1">
+                                <img src="${p.imageData}" alt="Lab Test" class="max-h-32 rounded-lg border border-slate-200 dark:border-slate-700 object-contain cursor-pointer transition-transform hover:scale-[1.02]" onclick="window.open('${p.imageData}')">
+                            </div>
+                        </div>` : ''}
+                    `;
+                    cardsWrapper.appendChild(card);
+                });
+                
+                container.appendChild(cardsWrapper);
+            }
+        }
+
+        function exportToWord() {
+            if (patients.length === 0) {
+                showToast('No patient records available to export.');
+                return;
+            }
+
+            // Create Word Document Elements using docx.js
+            const children = [
+                new docx.Paragraph({ 
+                    text: "Clinical Ward Handover Report", 
+                    heading: docx.HeadingLevel.HEADING_1,
+                    alignment: docx.AlignmentType.CENTER
+                }),
+                new docx.Paragraph({ text: `Generated Date: ${new Date().toLocaleString()}`, spacing: { after: 100 } }),
+                new docx.Paragraph({ text: `Total Active Cases: ${patients.length}`, spacing: { after: 300 } }),
+            ];
+
+            patients.forEach((p, index) => {
+                children.push(new docx.Paragraph({ 
+                    text: `Case #${index + 1}: ${p.name} (${p.gender}, ${p.age} y/o)`, 
+                    heading: docx.HeadingLevel.HEADING_2,
+                    spacing: { before: 400, after: 150 }
+                }));
+
+                // Helper to add lines with bold labels
+                const addLine = (label, value) => {
+                    children.push(new docx.Paragraph({
+                        children: [
+                            new docx.TextRun({ text: `${label}: `, bold: true }),
+                            new docx.TextRun(value || 'None')
+                        ],
+                        spacing: { after: 50 }
+                    }));
+                };
+
+                addLine("Location / Ward", p.location);
+                if (p.physician) addLine("Attending Physician", p.physician);
+                addLine("Chief Complaint", p.complaint);
+                addLine("Past Medical History (PMH)", p.pmh);
+                addLine("Past Surgical History (PSH)", p.psh);
+                addLine("Allergies", p.allergies);
+                addLine("Current Medications", p.medications);
+                addLine("Examination (O/E)", p.exam || 'N/A');
+                addLine("Management Plan", p.plan || 'N/A');
+                if (p.imageData) {
+                    addLine("Attachment", "Image attached (view in digital app)");
+                }
+                
+                children.push(new docx.Paragraph({ text: "" })); // Empty line between cases
+            });
+
+            // Assemble the document
+            const doc = new docx.Document({
+                sections: [{
+                    properties: {},
+                    children: children
+                }]
+            });
+
+            // Generate binary blob and trigger share/download
+            docx.Packer.toBlob(doc).then(blob => {
+                const filename = `Patient_Handover_${new Date().toISOString().slice(0, 10)}.docx`;
+                
+                // Try Native Share API first (Best for iOS/iPhone and Android)
+                try {
+                    const file = new File([blob], filename, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        navigator.share({
+                            files: [file],
+                            title: 'Patient Handover',
+                            text: 'Clinical Ward Handover Report'
+                        }).then(() => {
+                            showToast('Document shared successfully!');
+                        }).catch((err) => {
+                            console.log('User cancelled share or share failed:', err);
+                        });
+                        return; // Exit function if share is successful
+                    }
+                } catch (e) {
+                    console.log("Web Share API not supported/failed, falling back to download link.");
+                }
+
+                // Fallback for Desktop computers or older browsers
+                try {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    
+                    setTimeout(() => {
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                    }, 300);
+                    
+                    showToast('Word document exported successfully!');
+                } catch (err) {
+                    console.error("Export failed: ", err);
+                    showToast('Export failed. Check browser permissions.');
+                }
+            });
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-message');
+            msgEl.innerText = message;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;').replace("'", '&#039;');
+        }
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
